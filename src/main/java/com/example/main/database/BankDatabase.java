@@ -26,11 +26,8 @@ public class BankDatabase {
 
     // singleton
     public static BankDatabase getInstance() {
-
-        synchronized (BankDatabase.class) {
-            if (bankDatabase == null) {
-                bankDatabase = new BankDatabase();
-            }
+        if (bankDatabase == null) {
+            bankDatabase = new BankDatabase();
         }
 
         return bankDatabase;
@@ -41,22 +38,22 @@ public class BankDatabase {
             Class.forName("org.postgresql.Driver");
             connection = DriverManager.getConnection(URL, USER, PASSWORD);
             System.out.println("Connected to the PostgreSQL server successfully.");
-//            MyDialog.showDialog("Database Connection", "Connected to the 'PostgreSQL' server successfully");
         } catch (SQLException | ClassNotFoundException e) {
             System.err.println(e.getMessage());
-//            MyDialog.showDialog("Database Connection", "Failed to Connected to the 'PostgreSQL' server");
         }
         return connection;
     }
 
     private void createTables() {
         try {
-            connection.createStatement().execute(CREATE_TABLE_ACCOUNT);
-            connection.createStatement().execute(CREATE_TABLE_ACCOUNT_OWNER);
-            connection.createStatement().execute(CREATE_TABLE_TRANSACTION);
+            boolean accountTableCreated = connection.createStatement().execute(CREATE_TABLE_ACCOUNT);
+            boolean ownerTableCreated = connection.createStatement().execute(CREATE_TABLE_ACCOUNT_OWNER);
+            boolean transactionTableCreated = connection.createStatement().execute(CREATE_TABLE_TRANSACTION);
 
-            MyDialog.showInfoDialog("Create Tables", "All Tables Created Successfully");
-            System.out.println("All Tables Created Successfully");
+            if (accountTableCreated && ownerTableCreated && transactionTableCreated) {
+                MyDialog.showInfoDialog("Create Tables", "All Tables Created Successfully");
+                System.out.println("All Tables Created Successfully");
+            }
 
         } catch (SQLException e) {
             MyDialog.showErrorDialog("Create Tables", "Failed to Create Tables");
@@ -71,30 +68,24 @@ public class BankDatabase {
         long genKey = 0;
 
         try {
-            PreparedStatement account_pstmt = connection.prepareStatement(insert_account_query, Statement.RETURN_GENERATED_KEYS);
+            PreparedStatement ps = connection.prepareStatement(insert_account_query, Statement.RETURN_GENERATED_KEYS);
 
-            account_pstmt.setString(1, account.getNumber());
-            account_pstmt.setDouble(2, account.getBalance());
-            account_pstmt.setString(3, account.getOwner().getName() + " " + account.getOwner().getFamily());
+            ps.setString(1, account.getNumber());
+            ps.setDouble(2, account.getBalance());
+            ps.setString(3, account.getOwner().getName() + " " + account.getOwner().getFamily());
 
-            int affectedAccountRows = account_pstmt.executeUpdate();
+            int affectedAccountRows = ps.executeUpdate();
 
             if (affectedAccountRows > 0) {
-                System.out.println("'Account' Inserted Successfully");
                 // get the ID back
-                try (ResultSet rs = account_pstmt.getGeneratedKeys()) {
-                    if (rs.next()) {
-                        genKey = rs.getLong(1);
-                    }
-                } catch (SQLException ex) {
-                    System.out.println(ex.getMessage());
+                ResultSet rs = ps.getGeneratedKeys();
+                if (rs.next()) {
+                    genKey = rs.getLong(1);
                 }
             }
-//            connection.close();
 
         } catch (SQLException ex) {
-            MyDialog.showErrorDialog(
-                    "Inserting 'Account' to database failed!", ex.getMessage());
+            MyDialog.showErrorDialog("Inserting 'Account' to database failed!", ex.getMessage());
         }
 
         return genKey;
@@ -122,16 +113,11 @@ public class BankDatabase {
             if (affectedOwnerRows > 0) {
                 MyDialog.showInfoDialog("Successful Operation", "'Account Owner' Inserted Successfully");
                 // get the ID back
-                try (ResultSet rs = owner_pstmt.getGeneratedKeys()) {
-                    if (rs.next()) {
-                        genKey = rs.getLong(1);
-                    }
-                } catch (SQLException ex) {
-                    MyDialog.showErrorDialog("Error in inserting 'Account' Owner to database", ex.getMessage());
+                ResultSet rs = owner_pstmt.getGeneratedKeys();
+                if (rs.next()) {
+                    genKey = rs.getLong(1);
                 }
             }
-
-//            connection.close();
 
         } catch (SQLException ex) {
             MyDialog.showErrorDialog("Error!", ex.getMessage());
@@ -162,16 +148,12 @@ public class BankDatabase {
             if (affectedAccountRows > 0) {
                 MyDialog.showInfoDialog("Successful Operation", "'Transaction' Inserted Successfully");
                 // get the ID back
-                try (ResultSet rs = trxPs.getGeneratedKeys()) {
-                    if (rs.next()) {
-                        genKey = rs.getLong(1);
-                    }
-                } catch (SQLException ex) {
-                    MyDialog.showErrorDialog("Error!", ex.getMessage());
+                ResultSet rs = trxPs.getGeneratedKeys();
+                if (rs.next()) {
+                    genKey = rs.getLong(1);
                 }
-            }
 
-//            connection.close();
+            }
 
         } catch (SQLException ex) {
             MyDialog.showErrorDialog("Error!", ex.getMessage());
@@ -183,6 +165,7 @@ public class BankDatabase {
     public List<Transaction> getAllTransactions() {
         String query = String.format("SELECT * FROM %s", TABLE_TRANSACTION);
         List<Transaction> transactionList = new ArrayList<>();
+
         try {
             PreparedStatement pstmt = connection.prepareStatement(query);
             ResultSet resultSet = pstmt.executeQuery();
@@ -205,8 +188,6 @@ public class BankDatabase {
 
 
             }
-
-//            connection.close();
 
         } catch (SQLException e) {
             MyDialog.showErrorDialog("Error!", e.getMessage());
@@ -238,9 +219,6 @@ public class BankDatabase {
             accountPs.executeUpdate();
 
             MyDialog.showInfoDialog("Successful Operation", "Account updated successfully");
-
-//            connection.close();
-
         } catch (SQLException ex) {
             MyDialog.showErrorDialog("Error!", ex.getMessage());
         }
@@ -252,8 +230,8 @@ public class BankDatabase {
 
         int affectedrows = 0;
 
-        try (Connection conn = connect(); PreparedStatement pstmt = conn.prepareStatement(SQL)) {
-
+        try {
+            PreparedStatement pstmt = connection.prepareStatement(SQL);
             pstmt.setDouble(1, amount);
             pstmt.setLong(2, id);
 
@@ -261,11 +239,10 @@ public class BankDatabase {
 
             MyDialog.showInfoDialog("Insert Records", "Number of Affected Rows: " + affectedrows);
 
-//            connection.close();
-
-        } catch (SQLException ex) {
-            MyDialog.showErrorDialog("Error!", ex.getMessage());
+        } catch (SQLException e) {
+            MyDialog.showErrorDialog("Error!", e.getMessage());
         }
+
         return affectedrows;
     }
 
@@ -275,8 +252,6 @@ public class BankDatabase {
             PreparedStatement pstmt = connection.prepareStatement(SQL, Statement.RETURN_GENERATED_KEYS);
             int affectedRows = pstmt.executeUpdate();
             MyDialog.showInfoDialog("Delete Records", "Number of Deleted Rows: " + affectedRows);
-
-//            connection.close();
 
             return affectedRows;
 
@@ -308,7 +283,6 @@ public class BankDatabase {
                 AccountOwner accountOwner = new AccountOwner(name, family, nationalCode, birthDate, null);
                 accountOwners.add(accountOwner);
             }
-//            connection.close();
 
         } catch (SQLException e) {
             MyDialog.showErrorDialog("Error!", e.getMessage());
@@ -341,8 +315,6 @@ public class BankDatabase {
                 accounts.add(account);
             }
 
-//            connection.close();
-
         } catch (SQLException e) {
             MyDialog.showErrorDialog("Error!", e.getMessage());
         }
@@ -374,7 +346,6 @@ public class BankDatabase {
 //                account.setTransactionList();
 
                 MyDialog.showInfoDialog("Successful Operation", "Account found with id: " + id);
-//                connection.close();
                 return account;
             }
         } catch (SQLException throwable) {

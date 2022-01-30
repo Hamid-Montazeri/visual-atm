@@ -6,14 +6,12 @@ import com.example.main.model.AccountOwner;
 import com.example.main.model.Transaction;
 import com.example.main.model.TransactionType;
 import com.example.main.util.DateConverter;
-import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
-import javafx.util.Callback;
 
 import java.net.URL;
 import java.text.DecimalFormat;
@@ -27,7 +25,6 @@ import static com.example.main.util.MyDialog.showErrorDialog;
 public class MainController implements Initializable {
 
     private BankDatabase bankDatabase;
-    private ObservableList<Transaction> list;
     private long ACCOUNT_ID;
 
     @FXML
@@ -61,42 +58,9 @@ public class MainController implements Initializable {
     @FXML
     private TableView<Transaction> tblShowTrx;
 
-//    @FXML
-//    private TableColumn<Transaction, String> trxNumber;
-//    @FXML
-//    private TableColumn<Transaction, String> trxDate;
-//    @FXML
-//    private TableColumn<Transaction, Double> trxAmount;
-//    @FXML
-//    private TableColumn<Transaction, String> trxType;
-//    @FXML
-//    private TableColumn<Transaction, Integer> trxAccountId;
-
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
         bankDatabase = BankDatabase.getInstance();
-
-//        initTable();
-
-
-    }
-
-    private void initTable() {
-        list = FXCollections.observableArrayList(bankDatabase.getAllTransactions());
-        tblShowTrx.setItems(list);
-
-        TableColumn<Transaction, String> numberCol = new TableColumn<>("شناسه تراکنش");
-        TableColumn<Transaction, String> dateCol = new TableColumn<>("تاریخ");
-        TableColumn<Transaction, Double> amountCol = new TableColumn<>("مبلغ");
-        TableColumn<Transaction, Object> typeCol = new TableColumn<>("نوع تراکنش");
-
-        numberCol.setCellValueFactory(new PropertyValueFactory<>("number"));
-        dateCol.setCellValueFactory((new PropertyValueFactory<>("date")));
-        amountCol.setCellValueFactory(new PropertyValueFactory<>("amount"));
-        typeCol.setCellValueFactory(new PropertyValueFactory<>("transactionType"));
-
-        tblShowTrx.getColumns().setAll(numberCol, dateCol, amountCol, typeCol);
-
     }
 
     @FXML
@@ -206,7 +170,7 @@ public class MainController implements Initializable {
 
         // update account balance in database
         bankDatabase.updateAccountBalance(
-                prevBalance + withdrawAmount,
+                prevBalance - withdrawAmount,
                 Long.parseLong(tfWithdrawAccountId.getText().trim())
         );
 
@@ -220,9 +184,23 @@ public class MainController implements Initializable {
 
     @FXML
     protected void showAllTransactions() {
-        initTable();
+        ObservableList<Transaction> data = FXCollections.observableArrayList(bankDatabase.getAllTransactions());
+        tblShowTrx.setItems(data);
 
-        if (list.size() == 0) {
+        TableColumn<Transaction, String> numberCol = new TableColumn<>("شناسه تراکنش");
+        TableColumn<Transaction, String> dateCol = new TableColumn<>("تاریخ");
+        TableColumn<Transaction, Double> amountCol = new TableColumn<>("مبلغ");
+        TableColumn<Transaction, Object> typeCol = new TableColumn<>("نوع تراکنش");
+
+        numberCol.setCellValueFactory(new PropertyValueFactory<>("number"));
+        dateCol.setCellValueFactory((new PropertyValueFactory<>("date")));
+        amountCol.setCellValueFactory(new PropertyValueFactory<>("amount"));
+        typeCol.setCellValueFactory(new PropertyValueFactory<>("transactionType"));
+
+
+        tblShowTrx.getColumns().setAll(numberCol, dateCol, amountCol, typeCol);
+
+        if (data.size() == 0) {
             showErrorDialog("Error!", "There is No Transactions in Database!");
         }
     }
