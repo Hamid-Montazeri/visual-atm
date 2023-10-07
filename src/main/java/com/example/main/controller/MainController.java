@@ -1,11 +1,15 @@
 package com.example.main.controller;
 
-import com.example.main.database.BankDatabase;
+import com.example.main.database.DatabaseHelper;
+import com.example.main.database.impl.AccountDao;
+import com.example.main.database.impl.AccountOwnerDao;
+import com.example.main.database.impl.TransactionDao;
 import com.example.main.model.Account;
 import com.example.main.model.AccountOwner;
 import com.example.main.model.Transaction;
 import com.example.main.model.TransactionType;
 import com.example.main.util.DateConverter;
+import com.example.main.util.MyDialog;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
@@ -14,6 +18,8 @@ import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 
 import java.net.URL;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.util.List;
@@ -24,8 +30,11 @@ import static com.example.main.util.MyDialog.showErrorDialog;
 
 public class MainController implements Initializable {
 
-    private BankDatabase bankDatabase;
-    private long ACCOUNT_ID;
+    private AccountDao accountDao;
+    private AccountOwnerDao accountOwnerDao;
+    private TransactionDao transactionDao;
+    Account account;
+    long accountId;
 
     @FXML
     private TextField tfName;
@@ -60,92 +69,89 @@ public class MainController implements Initializable {
 
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
-        bankDatabase = BankDatabase.getInstance();
+        accountDao = new AccountDao();
+        accountOwnerDao = new AccountOwnerDao();
+        transactionDao = new TransactionDao();
+
+
+        DatabaseHelper databaseHelper = DatabaseHelper.getInstance();
+        Connection connection = databaseHelper.getConnection();
+        if (connection != null) {
+            databaseHelper.createTables(connection);
+        }
     }
 
     @FXML
     protected void openAccount() {
-        String ownerName = tfName.getText().trim();
-        String ownerFamily = tfFamily.getText().trim();
-        String ownerNationalCode = tfNationalCode.getText().trim();
-        if (dp.getValue() == null) {
-            dp.setValue(LocalDate.now());
-        }
-        String date = dp.getValue().toString();
+        AccountOwner accountOwner = createAccountOwner();
+        if (accountOwner == null) return;
 
-        AccountOwner owner = new AccountOwner();
-        owner.setName(ownerName);
-        owner.setFamily(ownerFamily);
+        Account account = new Account(accountOwner, 0);
+        accountId = accountDao.save(account);
+
+        accountOwner.setAccounts(List.of(account));
+        accountOwnerDao.save(accountOwner);
+    }
+
+    private AccountOwner createAccountOwner() {
+        AccountOwner accountOwner = new AccountOwner();
+        accountOwner.setName(tfName.getText().trim());
+        accountOwner.setFamily(tfFamily.getText().trim());
+        accountOwner.setBirthDate(
+                dp.getValue() == null ? String.valueOf(LocalDate.now()) : dp.getValue().toString()
+        );
         try {
-            owner.setNationalCode(ownerNationalCode);
+            accountOwner.setNationalCode(tfNationalCode.getText().trim());
         } catch (Exception e) {
             showErrorDialog("Error!", e.getMessage());
-            return;
+            return null;
         }
-        owner.setBirthDate(date);
-
-        Account account = new Account(owner);
-        ACCOUNT_ID = bankDatabase.insertAccount(account);
-        bankDatabase.insertAccountOwner(account, ACCOUNT_ID);
+        return accountOwner;
     }
 
     @FXML
     protected void editAccountOwner() {
-        String ownerName = tfEditName.getText().trim();
-        String ownerFamily = tfEditFamily.getText().trim();
-        String ownerNationalCode = tfEditNationalCode.getText().trim();
-        if (editDp.getValue() == null) {
-            editDp.setValue(LocalDate.now());
-        }
-        String date = editDp.getValue().toString();
-        AccountOwner owner = new AccountOwner();
-        owner.setName(ownerName);
-        owner.setFamily(ownerFamily);
         try {
-            owner.setNationalCode(ownerNationalCode);
+            AccountOwner newAccountOwner = new AccountOwner();
+            newAccountOwner.setName(tfEditName.getText().trim());
+            newAccountOwner.setFamily(tfEditFamily.getText().trim());
+            newAccountOwner.setBirthDate(editDp.getValue() == null ? String.valueOf(LocalDate.now()) : editDp.getValue().toString());
+            newAccountOwner.setNationalCode(tfEditNationalCode.getText().trim());
+
+            long accountId = Long.parseLong(tfEditAccountId.getText().trim());
+
+            accountOwnerDao.update(newAccountOwner, accountId);
         } catch (Exception e) {
             showErrorDialog("Error!", e.getMessage());
-            return;
         }
-        owner.setBirthDate(date);
-        long accountId = Long.parseLong(tfEditAccountId.getText().trim());
-
-        bankDatabase.updateAccountOwner(owner, accountId);
-
     }
 
     @FXML
     private void deposit() {
-        Transaction transaction = new Transaction(
-                String.valueOf(new Random().nextInt(1000, 9999)),
-                DateConverter.getPersianDate(),
-                Double.parseDouble(tfDepositAmount.getText().trim()),
-                TransactionType.DEPOSIT
-        );
+        String trxNumber = String.valueOf(new Random().nextInt(1000, 9999));
+        String trxDate = DateConverter.getPersianDate();
+        double amount = Double.parseDouble(tfDepositAmount.getText().trim());
+
+        Transaction transaction = new Transaction(trxNumber, trxDate, amount, TransactionType.DEPOSIT, account);
+
         // insert transaction to database
-        bankDatabase.insertTransaction(
-                transaction,
-                Long.parseLong(tfDepositAccountId.getText().trim())
-        );
+        long generatedTransactionId = transactionDao.save(transaction);
 
         // get previous balance from database
-        double prevBalance = bankDatabase.findAccountById(Long.parseLong(tfDepositAccountId.getText().trim()))
+        double prevBalance = accountDao.findAccountById(Long.parseLong(tfDepositAccountId.getText().trim()))
                 .getBalance();
 
-        double depositAmount = Double.parseDouble(tfDepositAmount.getText().trim());
-
         // update account balance in database
-        bankDatabase.updateAccountBalance(
-                prevBalance + depositAmount,
+        accountDao.updateAccountBalance(
+                prevBalance + amount,
                 Long.parseLong(tfDepositAccountId.getText().trim())
         );
     }
 
     @FXML
     private void withdraw() {
-
         // get previous balance from database
-        double prevBalance = bankDatabase.findAccountById(Long.parseLong(tfWithdrawAccountId.getText().trim()))
+        double prevBalance = accountDao.findAccountById(Long.parseLong(tfWithdrawAccountId.getText().trim()))
                 .getBalance();
 
         double withdrawAmount = Double.parseDouble(tfWithdrawAmount.getText().trim());
@@ -159,17 +165,14 @@ public class MainController implements Initializable {
                 String.valueOf(new Random().nextInt(1000, 9999)),
                 DateConverter.getPersianDate(),
                 Double.parseDouble(tfWithdrawAmount.getText().trim()),
-                TransactionType.WITHDRAW
-        );
+                TransactionType.WITHDRAW,
+                account);
 
         // insert transaction to database
-        bankDatabase.insertTransaction(
-                transaction,
-                Long.parseLong(tfWithdrawAccountId.getText().trim())
-        );
+        transactionDao.save(transaction);
 
         // update account balance in database
-        bankDatabase.updateAccountBalance(
+        accountDao.updateAccountBalance(
                 prevBalance - withdrawAmount,
                 Long.parseLong(tfWithdrawAccountId.getText().trim())
         );
@@ -179,12 +182,12 @@ public class MainController implements Initializable {
     @FXML
     private void deleteAllTransactions() {
         tblShowTrx.getItems().clear();
-        bankDatabase.deleteAllTransactions();
+        transactionDao.deleteAll();
     }
 
     @FXML
     protected void showAllTransactions() {
-        ObservableList<Transaction> data = FXCollections.observableArrayList(bankDatabase.getAllTransactions());
+        ObservableList<Transaction> data = FXCollections.observableArrayList(transactionDao.getAll());
         tblShowTrx.setItems(data);
 
         TableColumn<Transaction, String> numberCol = new TableColumn<>("شناسه تراکنش");
@@ -200,26 +203,31 @@ public class MainController implements Initializable {
 
         tblShowTrx.getColumns().setAll(numberCol, dateCol, amountCol, typeCol);
 
-        if (data.size() == 0) {
+        if (data.isEmpty()) {
             showErrorDialog("Error!", "There is No Transactions in Database!");
         }
     }
 
     @FXML
     protected void onDepositTabSelected() {
-        if (anyAccountExists()) {
-            double balance = bankDatabase.getAllAccounts().get(0).getBalance();
-            DecimalFormat format = new DecimalFormat("###,###");
-            String formattedBalance = format.format(balance);
-            lblBalance.setText("موجودی حساب: " + formattedBalance + " ريال");
+        try {
+            if (anyAccountExists()) {
+                double balance = accountDao.getAll().get(0).getBalance();
+                DecimalFormat format = new DecimalFormat("###,###");
+                String formattedBalance = format.format(balance);
+                lblBalance.setText("موجودی حساب: " + formattedBalance + " ريال");
+            }
+        } catch (SQLException e) {
+            MyDialog.showErrorDialog("Error", e.getMessage());
         }
     }
 
-    private boolean anyAccountExists() {
-        List<Account> allAccounts = bankDatabase.getAllAccounts();
-        List<AccountOwner> allAccountOwners = bankDatabase.getAllAccountOwners();
-        return allAccounts.size() > 0 || allAccountOwners.size() > 0;
+    private boolean anyAccountExists() throws SQLException {
+        List<Account> accounts = accountDao.getAll();
+        ;
+        List<AccountOwner> allAccountOwners = accountOwnerDao.getAll();
+        ;
+        return !accounts.isEmpty() || !allAccountOwners.isEmpty();
     }
-
 
 }

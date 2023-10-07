@@ -3,48 +3,46 @@ package com.example.main.database;
 import com.example.main.model.Account;
 import com.example.main.model.AccountOwner;
 import com.example.main.model.Transaction;
-import com.example.main.model.TransactionType;
 import com.example.main.util.MyDialog;
 
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.example.main.util.Constants.*;
+import static com.example.main.database.DatabaseUtils.*;
 
 
-public class BankDatabase {
+public class DatabaseHelper {
 
     private Connection connection;
 
-    private static BankDatabase bankDatabase;
-
-    private BankDatabase() {
-        connection = connect();
-        createTables();
-    }
+    private static DatabaseHelper databaseHelper;
 
     // singleton
-    public static BankDatabase getInstance() {
-        if (bankDatabase == null) {
-            bankDatabase = new BankDatabase();
+    public static DatabaseHelper getInstance() {
+        try {
+            if (databaseHelper == null) {
+                databaseHelper = new DatabaseHelper();
+            } else if (databaseHelper.getConnection().isClosed()) {
+                databaseHelper = new DatabaseHelper();
+            }
+        } catch (SQLException e) {
+            System.err.println(e.getMessage());
         }
-
-        return bankDatabase;
+        return databaseHelper;
     }
 
-    private Connection connect() {
+    private DatabaseHelper() throws SQLException {
         try {
             Class.forName("org.postgresql.Driver");
-            connection = DriverManager.getConnection(URL, USER, PASSWORD);
+            this.connection = DriverManager.getConnection(URL, USER, PASSWORD);
             System.out.println("Connected to the PostgreSQL server successfully.");
         } catch (SQLException | ClassNotFoundException e) {
             System.err.println(e.getMessage());
         }
-        return connection;
     }
 
-    private void createTables() {
+    public void createTables(Connection connection) {
         try {
             boolean accountTableCreated = connection.createStatement().execute(CREATE_TABLE_ACCOUNT);
             boolean ownerTableCreated = connection.createStatement().execute(CREATE_TABLE_ACCOUNT_OWNER);
@@ -162,40 +160,6 @@ public class BankDatabase {
         return genKey;
     }
 
-    public List<Transaction> getAllTransactions() {
-        String query = String.format("SELECT * FROM %s", TABLE_TRANSACTION);
-        List<Transaction> transactionList = new ArrayList<>();
-
-        try {
-            PreparedStatement pstmt = connection.prepareStatement(query);
-            ResultSet resultSet = pstmt.executeQuery();
-            while (resultSet.next()) {
-                //Display values
-                String number = String.valueOf(resultSet.getInt("number"));
-                String date = resultSet.getString("date");
-                double amount = resultSet.getDouble("amount");
-                String type = resultSet.getString("type");
-                int accountId = resultSet.getInt("account_id");
-
-                Transaction transaction = new Transaction(
-                        number,
-                        date,
-                        amount,
-                        type.equals("واریز") ? TransactionType.DEPOSIT : TransactionType.WITHDRAW
-                );
-
-                transactionList.add(transaction);
-
-
-            }
-
-        } catch (SQLException e) {
-            MyDialog.showErrorDialog("Error!", e.getMessage());
-        }
-
-        return transactionList;
-    }
-
     public void updateAccountOwner(AccountOwner owner, long accountId) {
         String ownerSql = String.format("UPDATE %s SET name = ? , family = ? , national_code = ? , birth_date = ? WHERE account_id = ?", TABLE_ACCOUNT_OWNER);
         String accountSql = String.format("UPDATE %s SET owner = ? WHERE id = ?", TABLE_ACCOUNT);
@@ -223,42 +187,6 @@ public class BankDatabase {
             MyDialog.showErrorDialog("Error!", ex.getMessage());
         }
 
-    }
-
-    public int updateAccountBalance(double amount, long id) {
-        String SQL = String.format("UPDATE %s SET balance = ? WHERE id = ?", TABLE_ACCOUNT);
-
-        int affectedrows = 0;
-
-        try {
-            PreparedStatement pstmt = connection.prepareStatement(SQL);
-            pstmt.setDouble(1, amount);
-            pstmt.setLong(2, id);
-
-            affectedrows = pstmt.executeUpdate();
-
-            MyDialog.showInfoDialog("Insert Records", "Number of Affected Rows: " + affectedrows);
-
-        } catch (SQLException e) {
-            MyDialog.showErrorDialog("Error!", e.getMessage());
-        }
-
-        return affectedrows;
-    }
-
-    public long deleteAllTransactions() {
-        String SQL = "DELETE FROM " + TABLE_TRANSACTION;
-        try {
-            PreparedStatement pstmt = connection.prepareStatement(SQL, Statement.RETURN_GENERATED_KEYS);
-            int affectedRows = pstmt.executeUpdate();
-            MyDialog.showInfoDialog("Delete Records", "Number of Deleted Rows: " + affectedRows);
-
-            return affectedRows;
-
-        } catch (SQLException ex) {
-            MyDialog.showErrorDialog("Error!", ex.getMessage());
-        }
-        return 0;
     }
 
     public List<AccountOwner> getAllAccountOwners() {
@@ -323,38 +251,9 @@ public class BankDatabase {
 
     }
 
-    public Account findAccountById(long id) {
-        String SQL = String.format("SELECT * from %s WHERE id = ?", TABLE_ACCOUNT);
 
-        try {
-            Connection conn = connect();
-            PreparedStatement pstmt = conn.prepareStatement(SQL);
-            pstmt.setLong(1, id);
-
-            ResultSet resultSet = pstmt.executeQuery();
-            Account account;
-            if (resultSet.next()) {
-                //Display values
-                String number = resultSet.getString("number");
-                double balance = resultSet.getDouble("balance");
-                String owner = resultSet.getString("owner");
-
-                account = new Account();
-                account.setNumber(number);
-                account.setBalance(balance);
-//                account.setOwner();
-//                account.setTransactionList();
-
-                MyDialog.showInfoDialog("Successful Operation", "Account found with id: " + id);
-                return account;
-            }
-        } catch (SQLException throwable) {
-            MyDialog.showErrorDialog("Error!", throwable.getMessage());
-        }
-
-        return null;
-
+    public Connection getConnection() {
+        return connection;
     }
-
 
 }

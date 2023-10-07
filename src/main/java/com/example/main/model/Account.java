@@ -1,14 +1,16 @@
 package com.example.main.model;
 
 import com.example.main.util.DateConverter;
-import com.example.main.util.Constants;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-public class Account {
+import static com.example.main.database.DatabaseUtils.MIN_BALANCE;
 
+
+public class Account {
+    private Long id;
     private String number;
     private double balance;
     private AccountOwner owner;
@@ -17,11 +19,19 @@ public class Account {
     public Account() {
     }
 
-    public Account(AccountOwner owner) {
+    public Account(AccountOwner owner, double balance) {
         this.number = String.valueOf(new Random().nextInt(100000, 200000));
-        this.balance = Constants.MIN_BALANCE;
+        this.balance = balance <= 0 ? MIN_BALANCE : balance;
         this.owner = owner;
         this.transactionList = new ArrayList<>();
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
     }
 
     public String getNumber() {
@@ -56,9 +66,9 @@ public class Account {
         this.transactionList = transactionList;
     }
 
-    public void withdraw(double amount) throws Exception {
-        if (getBalance() - amount < Constants.MIN_BALANCE) {
-            throw new Exception("Entered amount is more than your balance! (Min balance is 20$)");
+    public void withdraw(double amount) {
+        if (this.balance - amount < MIN_BALANCE) {
+            throw new RuntimeException("Entered amount is more than your balance! (Min balance is " + MIN_BALANCE + ")");
         }
 
         setBalance(balance - amount);
@@ -67,29 +77,23 @@ public class Account {
                 String.valueOf(new Random().nextInt(1000, 9999)),
                 DateConverter.getPersianDate(),
                 amount,
-                TransactionType.WITHDRAW
-        );
+                TransactionType.WITHDRAW,
+                this);
 
         transactionList.add(transaction);
     }
 
     public void deposit(double amount) {
-        setBalance(getBalance() + amount);
+        setBalance(this.balance + amount);
 
         Transaction transaction = new Transaction(
                 String.valueOf(new Random().nextInt(1000, 9999)),
                 DateConverter.getPersianDate(),
                 amount,
-                TransactionType.DEPOSIT
-        );
+                TransactionType.DEPOSIT,
+                this);
 
         transactionList.add(transaction);
     }
-
-    @Override
-    public String toString() {
-        return String.format(Constants.DASH_LINE + "Account Number: %s\nOwner: %s\nAccount Balance: %s$\nMin Balance: %s$" + Constants.DASH_LINE, number, owner, balance, Constants.MIN_BALANCE);
-    }
-
 
 }

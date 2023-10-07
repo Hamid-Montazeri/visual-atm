@@ -1,9 +1,6 @@
 package com.example.main.util;
 
 import javafx.scene.control.Alert;
-import javafx.scene.control.TextField;
-
-import java.util.Objects;
 
 public class MyDialog {
 
@@ -24,8 +21,6 @@ public class MyDialog {
 
         alert.showAndWait();
     }
-
-
 
 
 }

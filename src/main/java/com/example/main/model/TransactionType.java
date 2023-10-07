@@ -2,10 +2,9 @@ package com.example.main.model;
 
 public enum TransactionType {
 
-
     DEPOSIT("واریز"), WITHDRAW("برداشت");
 
-    private String value;
+    private final String value;
 
     TransactionType(String value) {
         this.value = value;
@@ -15,6 +14,12 @@ public enum TransactionType {
         return value;
     }
 
-
+    public static TransactionType getByValue(String value) {
+        return switch (value) {
+            case "واریز" -> DEPOSIT;
+            case "برداشت" -> WITHDRAW;
+            default -> null;
+        };
+    }
 
 }

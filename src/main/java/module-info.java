@@ -18,5 +18,4 @@ module com.example.main {
     opens com.example.main.controller to javafx.fxml;
     opens com.example.main.model to javafx.base;
 
-
 }

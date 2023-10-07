@@ -1,12 +1,13 @@
-package com.example.main.util;
+package com.example.main.database;
 
-public class Constants {
+public class DatabaseUtils {
 
-    public static final double MIN_BALANCE = 200000;
+    public static final double MIN_BALANCE = 200_000;
     public static final String DASH_LINE = "\n------------------------------\n";
 
     // database
-    public static final String URL = "jdbc:postgresql://localhost:5432/atm";
+    public static final String DB_NAME = "ATM";
+    public static final String URL = "jdbc:postgresql://localhost:5432/" + DB_NAME;
     public static final String USER = "postgres";
     public static final String PASSWORD = "123456";
     // tables

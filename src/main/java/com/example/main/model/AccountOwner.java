@@ -4,6 +4,7 @@ import java.util.List;
 
 public class AccountOwner {
 
+    private Long id;
     private String name;
     private String family;
     private String nationalCode;
@@ -19,6 +20,14 @@ public class AccountOwner {
         this.nationalCode = nationalCode;
         this.birthDate = birthDate;
         this.accounts = accounts;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
     }
 
     public String getName() {
@@ -41,6 +50,10 @@ public class AccountOwner {
         return nationalCode;
     }
 
+    public void setNationalCode(String nationalCode) {
+        this.nationalCode = nationalCode;
+    }
+
     public String getBirthDate() {
         return birthDate;
     }
@@ -55,25 +68,5 @@ public class AccountOwner {
 
     public void setAccounts(List<Account> accounts) {
         this.accounts = accounts;
-    }
-
-    public void setNationalCode(String nationalCode) throws Exception {
-
-        if (nationalCode.trim().length() != 10) {
-            throw new Exception("کد ملی باید 10 رقمی باشد");
-        }
-
-        this.nationalCode = nationalCode;
-    }
-
-    @Override
-    public String toString() {
-        return "AccountOwner{" +
-                "name='" + name + '\'' +
-                ", family='" + family + '\'' +
-                ", nationalCode='" + nationalCode + '\'' +
-                ", birthDate='" + birthDate + '\'' +
-                ", accounts=" + accounts +
-                '}';
     }
 }
